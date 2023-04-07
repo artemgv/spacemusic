@@ -1,0 +1,68 @@
+:: Просматриваем список доступных образов
+wsl -l -o
+--------
+
+:: Устанавливаем  и запускаем образ Ubuntu
+wsl --install -d Ubuntu
+--------
+
+# Приводим приглашение к виду dev1@x:~$
+sudo nano /etc/wsl.conf
+
+## Файл wsl.conf нужно сделать таким
+[network]
+hostname = x
+generateHosts = false
+--------
+
+sudo nano /etc/hosts
+
+## Нужно поставить x в этой строке
+127.0.1.1       DESKTOP-ABC222.localdomain     x
+--------
+
+# Добавляем в приглашение информацию о текущей ветке -
+# в файле ~/.bashrc нужно заменить фрагмент
+# if [ "$color_prompt" = yes ]; then ... unset color_prompt force_color_prompt
+
+nano ~/.bashrc
+
+## вот таким фрагментом
+parse_git_branch() {
+  git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'
+}
+if [ "$color_prompt" = yes ]; then
+  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[01;31m\]$(parse_git_branch)\[\033[00m\]\$ '
+else
+  PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w$(parse_git_branch)\$ '
+fi
+--------
+
+exit
+--------
+
+:: перегружаем машину
+wsl -t Ubuntu
+wsl ~ -d Ubuntu
+--------
+
+clear
+--------
+
+# Устанавливаем pre-commit
+sudo apt update
+sudo apt install python3-pip -y
+sudo pip install pre-commit
+pre-commit --version
+--------
+
+# Генерируем ключи
+ssh-keygen
+--------
+
+cat .ssh/id_rsa.pub
+--------
+
+echo "https://mycompany.atlassian.net/#/Task/3729" > tasks.todo
+echo "Добавить сервер 192.168.0.70 в список развертывания." >> tasks.todo
+--------

@@ -1,0 +1,36 @@
+# Выводим текст заявки, назначенной на разработчика dev1
+dev1@x:~$ cat tasks.todo
+ll
+
+ghUSERNAME=artemgv
+ghREPONAME=spacemusic
+
+git clone --branch dev git@github.com:$ghUSERNAME/$ghREPONAME.git
+cd $ghREPONAME
+
+git checkout -b "#3729"
+ll
+pre-commit install
+
+echo "192.168.0.70" >> deploy_hosts.list
+git add deploy_hosts.list
+git config --global user.name "dev1"
+git config --global user.email "dev1@ex.com"
+git commit -m "ci: #3729 сервер 192.168.0.70 добавлен в список развертывания"
+git push origin "#3729"
+echo "https://github.com/$ghUSERNAME/$ghREPONAME/compare/dev...$(git symbolic-ref --short HEAD)" | sed "s/#/%23/1"
+# в консоли появится ссылка на создание pr dev <- #3729, создаем pr
+# когда он будет одобрен, remote-ветка #3729 вольется в dev и будет удалена администратором
+
+# возвращаемся к dev
+git checkout dev
+# и актуализируем информацию remote-ветках в локальном репо
+git branch -vva
+git remote prune origin
+git branch -vva
+# убеждаемся что remote-ветка #3729 исчезла
+# и удаляем локальную ветку
+git branch -D "#3729"
+
+# обновляем dev и ждем следующую заявку
+git pull

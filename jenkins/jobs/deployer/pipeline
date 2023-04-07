@@ -1,0 +1,37 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                sh "rm -rf ${WORKSPACE}/app/"
+                sh "rm -rf ${WORKSPACE}/nginx/"
+                sh "rm -rf ${WORKSPACE}/provisioning/"
+                sh "rm -f ${WORKSPACE}/.env.prod*"
+                script {
+                    if ("${RELEASE}" == "master") {
+                        git branch: "master", url: "${GIT_URL}", credentialsId: "jenkins-private-ssh-key"
+                    } else {
+                        checkout scm: [$class: "GitSCM", userRemoteConfigs: [[url: "${GIT_URL}", credentialsId: "jenkins-private-ssh-key" ]], branches: [[name: "refs/tags/${RELEASE}"]]], poll: false
+                    }
+                }
+                sh "echo '      ansible_host: ${SERVER_IP}' >> ${WORKSPACE}/provisioning/hosts.yml"
+            }
+        }
+        stage('Deploy') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'jenkins-private-ssh-key', keyFileVariable: 'PRIVATE')]) {
+                  sh "ssh -i ${PRIVATE} vagrant@${SERVER_IP} 'rm -rf ~/project/'"
+                  sh "ssh -i ${PRIVATE} vagrant@${SERVER_IP} 'mkdir ~/project'"
+                  sh "scp -i ${PRIVATE} -r ${WORKSPACE}/app vagrant@${SERVER_IP}:~/project/app/"
+                  sh "scp -i ${PRIVATE} -r ${WORKSPACE}/nginx vagrant@${SERVER_IP}:~/project/nginx/"
+                  sh "scp -i ${PRIVATE} -r ${WORKSPACE}/provisioning vagrant@${SERVER_IP}:~/project/provisioning/"
+                  sh "scp -i ${PRIVATE} ${WORKSPACE}/.env.prod vagrant@${SERVER_IP}:~/project/"
+                  sh "scp -i ${PRIVATE} ${WORKSPACE}/.env.prod.db vagrant@${SERVER_IP}:~/project/"
+                  sh "scp -i ${PRIVATE} ${WORKSPACE}/docker-compose.prod.yml vagrant@${SERVER_IP}:~/project/"
+                  sh "ansible-playbook provisioning/site.yml -i provisioning/hosts.yml --private-key $PRIVATE"
+                }
+            }
+        }
+    }
+}

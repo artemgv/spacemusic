@@ -1,0 +1,44 @@
+# Выводим текст заявки, назначенной на разработчика dev2
+dev2@y:~$ cat tasks.todo
+ll
+
+ghUSERNAME=artemgv
+ghREPONAME=spacemusic
+
+git clone --branch dev git@github.com:$ghUSERNAME/$ghREPONAME.git
+cd $ghREPONAME
+
+git checkout -b "#3730"
+ll
+pre-commit install
+
+# устанавливаем Docker for Windows
+# запускаем отладку в PyCharm
+# находим и исправляем ошибку в app/main/utilities.py
+import re
+subject = re.sub(r"^\s+|\n|\r|\s+$", "", subject)
+
+git status
+git add app/main/utilities.py
+git config --global user.name "dev2"
+git config --global user.email "dev2@ex.com"
+git commit -m "fix: #3730 восстановлена возможность рассылки email-уведомлений"
+git push -u origin "#3730"
+echo "https://github.com/$ghUSERNAME/$ghREPONAME/compare/dev...$(git symbolic-ref --short HEAD)" | sed "s/#/%23/1"
+
+# в консоли появится ссылка на создание pr dev <- #3730, создаем pr
+# когда он будет одобрен, remote-ветка #3730 вольется в dev и будет удалена администратором
+
+# возвращаемся к dev
+git checkout dev
+# и актуализируем информацию remote-ветках в локальном репо
+git branch -vva
+git remote prune origin
+git branch -vva
+# убеждаемся что remote-ветка #3730 исчезла
+# и удаляем локальную ветку
+git branch -D "#3730"
+git branch -vva
+
+# обновляем dev и ждем следующую заявку
+git pull

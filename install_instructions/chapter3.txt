@@ -1,0 +1,297 @@
+title Jenkins
+
+:: Перед установкой сервера Jenkins необходимо
+:: заказать у провайдера статический IP-адрес и
+:: настроить на роутере проброс порта 8080 до этого сервера
+
+# Образ alvistack/ubuntu-22.04 нужно скачать https://app.vagrantup.com/alvistack/boxes/ubuntu-22.04 и добавить в Vagrant:
+#   vagrant box add alvistack/ubuntu-22.04 "C:/path/to/downloaded/image/alvistack-ubuntu-22.04-vagrant.box" --force
+# Важно, чтобы образ был свежим! Иначе на шаге "Обновить систему" могут возникнуть проблемы.
+
+type Vagrantfile
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "alvistack/ubuntu-22.04"
+  config.vm.hostname = "jenkins"
+  config.vm.boot_timeout = 1800
+  config.vm.network "forwarded_port", guest: 8080, host: 8080
+  config.vm.network "forwarded_port", guest: 22, host: 2226, id: "ssh"
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 4096
+    v.cpus = 1
+  end
+end
+
+vagrant up
+
+:: запускаем MobaXterm и помещаем в домашний каталог пользователя vagrant
+:: архив с шаблоном проекта repo_template.tar.gz
+
+:: Подключаемся к будущему Jenkins-серверу
+vagrant ssh
+ll
+
+#
+# Распаковываем архив с шаблоном
+#
+tar -zxf repo_template.tar.gz
+
+ll
+
+#
+# Обновляем систему
+#
+sudo apt update && sudo apt upgrade -y
+
+#
+# Устанавливаем Ansible
+#
+sudo add-apt-repository --yes --update ppa:ansible/ansible && \
+sudo apt update && \
+sudo apt install ansible -y
+
+#
+# Проверяем версию Ansible.
+# Проект тестировался на core 2.12.10
+#
+ansible --version
+
+#
+# Официальный мануал по установке последней версии Jenkins находится здесь https://pkg.jenkins.io/debian-stable/
+# Но поскольку нам нужна конкретная версия Jenkins LTS 2.387.1, то будем ставить из deb-файла
+#
+sudo apt install fontconfig openjdk-11-jre -y && \
+sudo apt install net-tools -y && \
+sudo dpkg -i repo_template/jenkins/jenkins_2.387.1_all.deb
+
+#
+# Генерируем ключи для Jenkins-сервера.
+# В каталоге ~/.ssh/ появятся файлы id_rsa и id_rsa.pub
+#
+ssh-keygen && \
+ll .ssh
+
+#
+# Сейчас нужно будет временно переключиться в окна
+# vagrant@50:~ и vagrant@60:~ чтобы прописать этот ключ
+cat .ssh/id_rsa.pub
+
+#
+# Создаем аккаунт на github.com и приватный репозиторий.
+# Не выходя из аккаунта, переходим в раздел с ключами
+# https://github.com/settings/keys и жмем "New SSH key"
+#  Title = jenkins_server
+#  Key type = Authentication Key
+#  Key = содержимое файла .ssh/id_rsa.pub
+# Жмем "Add SSH key" чтобы сохранить ключ
+#
+
+#
+# Не выходя из аккаунта cоздаем вебхук:
+# Repository Settings > Webhooks > Add webhook
+#  Payload URL = http://90.188.45.81:8080/github-webhook/
+#  Content type = application/json
+# здесь 90.188.45.81 - это статический IP Jenkins-сервера
+#
+
+#
+# Инициализируем переменные ghUSERNAME и ghREPONAME
+#
+ghUSERNAME=artemgv && \
+ghREPONAME=spacemusic && \
+echo git@github.com:$ghUSERNAME/$ghREPONAME.git
+# подставьте свои значения (пробелы после равно недопустимы)
+
+#
+# Email, на который зарегистрирован github аккаунт.
+# (понадобится для первого коммита)
+#
+ghUSEREMAIL=artemgv@mail.ru
+
+#
+# Если нет собственного сайта, в котором ведутся тикеты,
+# то поставьте такое значение
+#
+ghISSUEURLFORMAT="https:\/\/mycompany.atlassian.net\/#\/Task\/{{id}}"
+# потом его можно будет исправить в release.config.js
+
+ll
+
+#
+# Переименовываем каталог с шаблоном в название репозитория
+#
+mv repo_template $ghREPONAME
+
+ll
+
+#
+# Подставляем инициализированные переменные
+# в шаблонные файлы
+#
+sed -i 's/ghUSERNAME/'$ghUSERNAME'/g' $ghREPONAME/jenkins/jobs/webhook_catcher/webhook_catcher.xml && \
+  sed -i 's/ghREPONAME/'$ghREPONAME'/g' $ghREPONAME/jenkins/jobs/webhook_catcher/webhook_catcher.xml && \
+  sed -i 's/ghUSERNAME/'$ghUSERNAME'/g' $ghREPONAME/jenkins/jobs/deployer/deployer.xml && \
+  sed -i 's/ghREPONAME/'$ghREPONAME'/g' $ghREPONAME/jenkins/jobs/deployer/deployer.xml && \
+  sed -i 's/ghUSERNAME/'$ghUSERNAME'/g' $ghREPONAME/release.config.js && \
+  sed -i 's/ghREPONAME/'$ghREPONAME'/g' $ghREPONAME/release.config.js && \
+  sed -i 's/ghISSUEURLFORMAT/'$ghISSUEURLFORMAT'/g' $ghREPONAME/release.config.js && \
+  echo "" > $ghREPONAME/app/CHANGELOG.md && \
+  echo 'version=""' > $ghREPONAME/app/version.toml
+
+#
+# Прописываем хосты, на которые Jenkins будет деплоить
+#
+echo "192.168.0.50" >> $ghREPONAME/deploy_hosts.list && \
+echo "192.168.0.60" >> $ghREPONAME/deploy_hosts.list
+
+#
+# Подкладываем дженкинсу нужные плагины
+#
+cat $ghREPONAME/jenkins/plugins.tar.gz.part* > plugins.tar.gz && \
+tar -xf plugins.tar.gz && \
+sudo cp plugins/* /var/lib/jenkins/plugins/ && \
+sudo chown jenkins:jenkins /var/lib/jenkins/plugins/*
+
+#
+# Сохраняем пароль пользователя admin в файле cred
+#
+echo admin:$(sudo cat /var/lib/jenkins/secrets/initialAdminPassword) > cred
+
+#
+# Перегружаем jenkins
+#
+wget http://localhost:8080/jnlpJars/jenkins-cli.jar && \
+java -jar jenkins-cli.jar -auth $(cat cred) -s http://localhost:8080/ safe-restart
+
+#
+# Логинимся в Jenkins http://localhost:8080/ с паролем
+#
+cat cred
+
+#
+# Появится окно Getting Started - Customize Jenkins
+# Закрываем его крестиком и жмем "Start using Jenkins"
+# Если Jenkins будет предлагать обновить плагины-
+# отказываемся т.к. джобы, которые мы будем импортировать
+# ссылаются на текущие версии плагинов.
+#
+
+#
+# Настроить Jenkins
+#   Конфигурация системы
+#      Количество сборщиков = 1
+#   Locale
+#      Default Language = en
+#      [v] Ignore browser preference and force this language to all users
+#   Кнопка "Сохранить" переключит интерфейс на английский язык
+#
+
+sudo su
+mkdir /var/lib/jenkins/.ssh/
+ssh-keyscan -t rsa github.com >> /var/lib/jenkins/.ssh/known_hosts
+ssh-keyscan -t rsa 192.168.0.50 >> /var/lib/jenkins/.ssh/known_hosts
+ssh-keyscan -t rsa 192.168.0.60 >> /var/lib/jenkins/.ssh/known_hosts
+exit
+
+#
+# Копируем в клипборд приватный ключ Jenkins-сервера
+#
+cat .ssh/id_rsa
+
+#
+# Manage Jenkins
+#   Manage Credentials
+#     (global)
+#       + Add Credentials
+#         Kind = SSH SSH Username with private key
+#         Scope = Global (Jenkins, nodes, items, etc)
+#         ID = jenkins-private-ssh-key
+#         Description = jenkins-private-ssh-key
+#         Username = значение переменной ghUSERNAME
+#           Private Key - Enter directly - Add
+#             Key = содержимое клипборда
+#         Жмем Create
+#
+
+#
+# Импортируем джобы и перегружаем jenkins
+#
+java -jar jenkins-cli.jar -auth $(cat cred) -s http://localhost:8080/ create-job webhook_catcher < $ghREPONAME/jenkins/jobs/webhook_catcher/webhook_catcher.xml && \
+java -jar jenkins-cli.jar -auth $(cat cred) -s http://localhost:8080/ create-job deployer < $ghREPONAME/jenkins/jobs/deployer/deployer.xml && \
+java -jar jenkins-cli.jar -auth $(cat cred) -s http://localhost:8080/ safe-restart
+
+ll
+
+#
+# Удаляем лишние файлы
+#
+rm repo_template.tar.gz && \
+rm -rf plugins && \
+rm plugins.tar.gz && \
+rm $ghREPONAME/jenkins/plugins.tar.gz.part* && \
+rm $ghREPONAME/jenkins/jenkins_2.387.1_all.deb
+
+ll
+
+#
+# Входим в каталог проекта
+#
+cd $ghREPONAME
+
+#
+# Инициализируем репозиторий и добавляем все файлы
+#
+git init && \
+git add -A
+
+#
+# Файл release.yml должен появиться в "master"
+# только после создания ветки "dev", поэтому
+# исключим его из первого комита
+#
+git rm --cached .github/workflows/release.yml
+
+#
+# Делаем первый прямой коммит в "master"
+#
+git config --global user.email "$ghUSEREMAIL" && \
+git config --global user.name "$ghUSERNAME" && \
+git commit -m "initial commit"
+
+#
+# Пушим в master
+#
+git remote add origin git@github.com:$ghUSERNAME/$ghREPONAME.git
+git push -u origin master
+
+#
+# Теперь создаем от "master" локальную ветку "dev" и пушим ее
+#
+git checkout -b dev && \
+git push -u origin dev
+
+#
+# Возвращаемся в master чтобы добавить файл release.yml
+#
+git checkout master && \
+git add .github/workflows/release.yml
+
+#
+# Делаем второй (и последний!) прямой коммит в "master"
+#
+git commit -m "build: first release" && \
+git push
+
+
+# Переходим в github и наблюдаем за появлением релиза.
+# Заходим в Jenkins и смотрим как приходит инфа о новом релизе
+
+#
+# Прямых коммитов в "master" и "dev" больше не будет.
+#
+# Ветка "master" будет меняться
+# только в результате PR и только из ветки "dev".
+#
+# Ветка "dev" будет меняться
+# только в результате PR и только из feature- веток.
+#

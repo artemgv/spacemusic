@@ -1,0 +1,32 @@
+# Меняем заголовок консольного окна Windows
+title 192.168.0.60
+cls
+
+# Образ alvistack/ubuntu-22.04 нужно скачать https://app.vagrantup.com/alvistack/boxes/ubuntu-22.04 и добавить в Vagrant:
+#   vagrant box add alvistack/ubuntu-22.04 "C:/path/to/downloaded/image/alvistack-ubuntu-22.04-vagrant.box" --force
+# Убрать ненужный образ можно так:
+#   vagrant box remove alvistack/ubuntu-22.04
+
+type Vagrantfile
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "alvistack/ubuntu-22.04"
+  config.vm.hostname = "60"
+  config.vm.network "public_network", ip: "192.168.0.60"
+  config.vm.network "forwarded_port", guest: 22, host: 2260, id: "ssh"
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 4096
+    v.cpus = 1
+  end
+end
+
+vagrant up
+vagrant ssh
+clear
+
+# Приглашение примет вид vagrant@60:~$
+ll
+ll .ssh
+
+# Публичный ключ Дженкинса прописывается так
+echo "..." >> .ssh/authorized_keys
