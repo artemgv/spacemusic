@@ -1,7 +1,7 @@
-``repo_template.tar.gz`` является приложением к видеоуроку
-# Django App CI/CD & SEMANTIC RELEASE
+Архив https://cloud.mail.ru/public/c4DH/o4us5RRKG является приложением к видеоуроку
+## Django App CI/CD & SEMANTIC RELEASE
 ``Пример реализации CI/CD стека, подходящего для разработки контейнеризированных Django Apps с автоверсионированием``
-https://youtu.be/MxP9S9TA3qo
+https://youtu.be/D2UYd7v9hIc
 
-Архив содержит ``шаблон`` проекта контейнеризированного Django App ``из которого`` можно развернуть полноценный CI\CD стек.
+Он содержит ``шаблон``  проекта контейнеризированного Django App ``из которого`` можно развернуть полноценный CI\CD стек.
 Необходимые для развертывания стека команды находятся в каталоге ``install_instructions`` в файлах ``chapter*.txt``
