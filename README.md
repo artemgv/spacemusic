@@ -1,4 +1,4 @@
-Архив https://cloud.mail.ru/public/c4DH/o4us5RRKG является приложением к видеоуроку
+Архив https://cloud.mail.ru/public/c4DH/o4us5RRKG является приложением к моему видеоуроку
 ## Django App CI/CD & SEMANTIC RELEASE
 ``Пример реализации CI/CD стека, подходящего для разработки контейнеризированных Django Apps с автоверсионированием``
 https://youtu.be/D2UYd7v9hIc
